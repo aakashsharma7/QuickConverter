@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Download, File, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,8 @@ interface ConversionJob {
   progress: number
   result?: Blob
   error?: string
+  downloadedAt?: number
+  isMarkedForRemoval?: boolean
 }
 
 const formatOptions = {
@@ -60,7 +62,37 @@ const formatOptions = {
 export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps) {
   const [conversionJobs, setConversionJobs] = useState<ConversionJob[]>([])
   const [isConverting, setIsConverting] = useState(false)
+  const [countdown, setCountdown] = useState(0)
   const { toast } = useToast()
+
+  // Cleanup effect to remove downloaded files after 10 seconds
+  React.useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now()
+      setCountdown(now)
+      
+      setConversionJobs(prev => {
+        const updatedJobs = prev.filter(job => {
+          // Remove files that were downloaded more than 10 seconds ago
+          if (job.downloadedAt && now - job.downloadedAt > 10000) {
+            return false
+          }
+          return true
+        })
+        
+        // If all jobs are removed, close the modal
+        if (updatedJobs.length === 0 && prev.length > 0) {
+          setTimeout(() => {
+            onClose()
+          }, 500) // Small delay for smooth animation
+        }
+        
+        return updatedJobs
+      })
+    }, 1000) // Check every second
+
+    return () => clearInterval(cleanupInterval)
+  }, [onClose])
 
   const getFileType = (file: File): 'image' | 'video' | 'audio' | 'document' | 'unknown' => {
     const extension = getFileExtension(file.name)
@@ -188,12 +220,50 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    
+    // Mark the file for removal after 10 seconds
+    const jobIndex = conversionJobs.findIndex(j => j.file === job.file)
+    if (jobIndex !== -1) {
+      updateJob(jobIndex, { 
+        downloadedAt: Date.now(),
+        isMarkedForRemoval: true
+      })
+      
+      toast({
+        title: "File Downloaded",
+        description: `${job.file.name} will be removed in 10 seconds.`,
+        duration: 3000,
+      })
+    }
   }
 
   const downloadAll = () => {
-    conversionJobs
-      .filter(job => job.status === 'completed' && job.result)
-      .forEach(job => downloadFile(job))
+    const completedJobs = conversionJobs.filter(job => job.status === 'completed' && job.result)
+    
+    completedJobs.forEach(job => {
+      const url = URL.createObjectURL(job.result!)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${job.file.name.split('.')[0]}.${job.targetFormat}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    })
+    
+    // Mark all completed files for removal
+    const now = Date.now()
+    setConversionJobs(prev => prev.map(job => 
+      job.status === 'completed' && job.result 
+        ? { ...job, downloadedAt: now, isMarkedForRemoval: true }
+        : job
+    ))
+    
+    toast({
+      title: "All Files Downloaded",
+      description: `${completedJobs.length} file(s) will be removed in 10 seconds.`,
+      duration: 3000,
+    })
   }
 
   const handleFormatChange = (index: number, format: string) => {
@@ -347,33 +417,41 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
                             {job.status === 'completed' && (
                               <div className="flex items-center space-x-2">
                                 <CheckCircle className="w-4 h-4 text-green-500" />
-                                                                 <motion.div
-                                   whileHover={{ scale: 1.05 }}
-                                   whileTap={{ scale: 0.95 }}
-                                   transition={{ type: "spring", stiffness: 400 }}
-                                 >
-                                   <Button
-                                     size="sm"
-                                     onClick={() => downloadFile(job)}
-                                     className="h-8"
-                                   >
-                                     <motion.div
-                                       animate={{ 
-                                         y: [0, -2, 0],
-                                         scale: [1, 1.1, 1]
-                                       }}
-                                       transition={{ 
-                                         duration: 1.5,
-                                         repeat: Infinity,
-                                         repeatType: "reverse",
-                                         ease: "easeInOut"
-                                       }}
-                                     >
-                                       <Download className="w-4 h-4 mr-1" />
-                                     </motion.div>
-                                     Download
-                                   </Button>
-                                 </motion.div>
+                                {job.isMarkedForRemoval ? (
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-orange-500">
+                                      Removing in {Math.max(0, Math.ceil((10000 - (countdown - (job.downloadedAt || 0))) / 1000))}s
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    transition={{ type: "spring", stiffness: 400 }}
+                                  >
+                                    <Button
+                                      size="sm"
+                                      onClick={() => downloadFile(job)}
+                                      className="h-8"
+                                    >
+                                      <motion.div
+                                        animate={{ 
+                                          y: [0, -2, 0],
+                                          scale: [1, 1.1, 1]
+                                        }}
+                                        transition={{ 
+                                          duration: 1.5,
+                                          repeat: Infinity,
+                                          repeatType: "reverse",
+                                          ease: "easeInOut"
+                                        }}
+                                      >
+                                        <Download className="w-4 h-4 mr-1" />
+                                      </motion.div>
+                                      Download
+                                    </Button>
+                                  </motion.div>
+                                )}
                               </div>
                             )}
                             {job.status === 'error' && (
