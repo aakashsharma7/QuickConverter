@@ -253,7 +253,15 @@ export function getFileExtension(filename: string): string {
 }
 
 export function isValidImageFormat(format: string): boolean {
-  return ['jpeg', 'jpg', 'png', 'webp', 'avif', 'gif'].includes(format)
+  return ['jpeg', 'jpg', 'png', 'webp', 'avif', 'gif', 'svg'].includes(format)
+}
+
+export function isValidIconFormat(format: string): boolean {
+  return ['ico', 'svg'].includes(format)
+}
+
+export function isValidVectorFormat(format: string): boolean {
+  return ['svg'].includes(format)
 }
 
 export function isValidVideoFormat(format: string): boolean {
@@ -266,4 +274,8 @@ export function isValidAudioFormat(format: string): boolean {
 
 export function isValidDocumentFormat(format: string): boolean {
   return ['pdf', 'docx', 'doc', 'rtf', 'txt'].includes(format)
+}
+
+export function isValidCodeFormat(format: string): boolean {
+  return ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'json', 'xml', 'yaml', 'yml'].includes(format)
 } 
