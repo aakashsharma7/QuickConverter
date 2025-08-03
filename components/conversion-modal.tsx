@@ -13,7 +13,8 @@ import {
   isValidImageFormat,
   isValidVideoFormat,
   isValidAudioFormat,
-  isValidDocumentFormat
+  isValidDocumentFormat,
+  isValidCodeFormat
 } from '@/lib/file-processing'
 
 interface ConversionModalProps {
@@ -38,7 +39,14 @@ const formatOptions = {
     { value: 'jpeg', label: 'JPEG (.jpg)', icon: '🖼️' },
     { value: 'png', label: 'PNG (.png)', icon: '🖼️' },
     { value: 'webp', label: 'WebP (.webp)', icon: '🖼️' },
-    { value: 'avif', label: 'AVIF (.avif)', icon: '🖼️' }
+    { value: 'avif', label: 'AVIF (.avif)', icon: '🖼️' },
+    { value: 'ico', label: 'ICO (.ico)', icon: '🎯' }
+  ],
+  svg: [
+    { value: 'png', label: 'PNG (.png)', icon: '🖼️' },
+    { value: 'jpeg', label: 'JPEG (.jpg)', icon: '🖼️' },
+    { value: 'webp', label: 'WebP (.webp)', icon: '🖼️' },
+    { value: 'ico', label: 'ICO (.ico)', icon: '🎯' }
   ],
   video: [
     { value: 'mp4', label: 'MP4 (.mp4)', icon: '🎥' },
@@ -56,6 +64,12 @@ const formatOptions = {
     { value: 'pdf', label: 'PDF (.pdf)', icon: '📄' },
     { value: 'txt', label: 'Text (.txt)', icon: '📄' },
     { value: 'html', label: 'HTML (.html)', icon: '📄' }
+  ],
+  code: [
+    { value: 'html', label: 'HTML (.html)', icon: '🌐' },
+    { value: 'js', label: 'JavaScript (.js)', icon: '⚡' },
+    { value: 'ts', label: 'TypeScript (.ts)', icon: '📘' },
+    { value: 'txt', label: 'Text (.txt)', icon: '📄' }
   ]
 }
 
@@ -94,13 +108,15 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
     return () => clearInterval(cleanupInterval)
   }, [onClose])
 
-  const getFileType = (file: File): 'image' | 'video' | 'audio' | 'document' | 'unknown' => {
+  const getFileType = (file: File): 'image' | 'video' | 'audio' | 'document' | 'svg' | 'code' | 'unknown' => {
     const extension = getFileExtension(file.name)
     
+    if (extension === 'svg') return 'svg'
     if (isValidImageFormat(extension)) return 'image'
     if (isValidVideoFormat(extension)) return 'video'
     if (isValidAudioFormat(extension)) return 'audio'
     if (isValidDocumentFormat(extension)) return 'document'
+    if (isValidCodeFormat(extension)) return 'code'
     
     return 'unknown'
   }
@@ -110,6 +126,8 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
     const extension = getFileExtension(file.name)
     
     switch (fileType) {
+      case 'svg':
+        return 'png' // Default SVG conversion to PNG
       case 'image':
         return formatOptions.image.find(f => f.value === extension)?.value || 'jpeg'
       case 'video':
