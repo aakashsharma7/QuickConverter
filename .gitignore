@@ -1,0 +1,66 @@
+# Node modules
+node_modules/
+
+# Build outputs
+.next/
+dist/
+out/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+
+# Optional: OS-specific
+*.log
+*.tgz
+
+# Firebase / Supabase
+.supabase/
+.firebase/
+
+# File uploads and generated files (optional)
+uploads/
+tmp/
+temp/
+files/
+
+# Ignore build artifacts from image/video/PDF tools
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.mp4
+*.mov
+*.avi
+*.heic
+*.zip
+*.tar
+*.gz
+
+# Ignore coverage reports
+coverage/
+*.lcov
+
+# Ignore local tooling
+*.local
+

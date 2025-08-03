@@ -82,7 +82,15 @@
   }
   
   .tool-card {
-    @apply relative overflow-hidden rounded-xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl;
+    @apply relative overflow-hidden rounded-xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer;
+  }
+  
+  .tool-card:hover {
+    @apply transform scale-105 shadow-2xl;
+  }
+  
+  .tool-card:active {
+    @apply transform scale-100;
   }
   
   .tool-card::before {

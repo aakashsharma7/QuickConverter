@@ -116,9 +116,26 @@ export default function Dashboard() {
   }
 
   const handleToolSelect = (toolName: string) => {
+    // Show a more detailed toast with action
     toast({
       title: "Tool Selected",
-      description: `Opening ${toolName}...`,
+      description: `${toolName} is ready to use!`,
+      action: (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => {
+            // Here you would typically navigate to the tool or open a modal
+            setShowConversionModal(true)
+            toast({
+              title: "Tool Activated",
+              description: `Starting ${toolName}...`,
+            })
+          }}
+        >
+          Start Now
+        </Button>
+      ),
     })
   }
 
