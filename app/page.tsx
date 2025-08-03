@@ -18,7 +18,9 @@ import {
   Sun,
   Moon,
   Menu,
-  X
+  X,
+  Github,
+  BarChart3
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +29,7 @@ import { useToast } from '@/hooks/use-toast'
 import { FileUploadZone } from '@/components/file-upload-zone'
 import { ToolCard } from '@/components/tool-card'
 import { ConversionModal } from '@/components/conversion-modal'
+import { AnalyticsDashboard } from '@/components/analytics-dashboard'
 
 const toolCategories = [
   {
@@ -89,6 +92,7 @@ export default function Dashboard() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showConversionModal, setShowConversionModal] = useState(false)
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
 
@@ -231,6 +235,15 @@ export default function Dashboard() {
                 <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
                 <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 <span className="sr-only">Toggle theme</span>
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAnalytics(true)}
+                className="hidden sm:flex"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
               </Button>
               
               <Button variant="gradient" className="hidden sm:flex">
@@ -553,12 +566,118 @@ export default function Dashboard() {
         </motion.section>
       </main>
 
+      {/* Footer */}
+      <footer className="bg-background/80 backdrop-blur-sm border-t border-border/50 mt-16">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.6 }}
+              className="flex items-center space-x-2"
+            >
+              <motion.div
+                whileHover={{ 
+                  scale: 1.1,
+                  rotate: 5,
+                  boxShadow: "0 5px 15px rgba(59, 130, 246, 0.3)"
+                }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              >
+                <Zap className="w-6 h-6 text-blue-500" />
+              </motion.div>
+              <span className="text-lg font-semibold text-gradient">QuickConvertor</span>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.6 }}
+              className="flex items-center space-x-4"
+            >
+              <motion.a
+                href="https://github.com/aakashsharma7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors"
+                whileHover={{ 
+                  scale: 1.05,
+                  color: "hsl(var(--foreground))"
+                }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              >
+                <motion.div
+                  whileHover={{ 
+                    rotate: 360,
+                    scale: 1.2
+                  }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 300, 
+                    damping: 20 
+                  }}
+                >
+                  <Github className="w-5 h-5" />
+                </motion.div>
+                <span className="font-medium">GitHub</span>
+              </motion.a>
+
+              {/* <motion.a
+                href="https://skyframe-io.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                whileHover={{ 
+                  scale: 1.05,
+                  color: "hsl(var(--foreground))"
+                }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              >
+                Aakash Sharma
+              </motion.a> */}
+            </motion.div>
+          </div>
+
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="mt-6 pt-6 border-t border-border/50 text-center text-sm text-muted-foreground"
+          >
+            <p>© 2025 QuickConvertor. All rights reserved.</p>
+          </motion.div>
+        </div>
+      </footer>
+
       {/* Conversion Modal */}
       <ConversionModal
         isOpen={showConversionModal}
         onClose={() => setShowConversionModal(false)}
         files={uploadedFiles}
       />
+
+      {/* Analytics Modal */}
+      {showAnalytics && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
+              <Button variant="ghost" size="icon" onClick={() => setShowAnalytics(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <AnalyticsDashboard />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
