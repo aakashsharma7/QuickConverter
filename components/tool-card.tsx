@@ -29,12 +29,24 @@ interface ToolCardProps {
 export function ToolCard({ category, onToolSelect }: ToolCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
+  const handleCardClick = () => {
+    onToolSelect(category.title)
+  }
+
+  const handleExpandClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsExpanded(!isExpanded)
+  }
+
   return (
     <motion.div
       whileHover={{ y: -5 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="h-full tool-card overflow-hidden">
+      <Card 
+        className="h-full tool-card overflow-hidden cursor-pointer"
+        onClick={handleCardClick}
+      >
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -51,7 +63,7 @@ export function ToolCard({ category, onToolSelect }: ToolCardProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={handleExpandClick}
               className="p-1"
             >
               {isExpanded ? (
@@ -82,7 +94,10 @@ export function ToolCard({ category, onToolSelect }: ToolCardProps) {
                   <Button
                     variant="ghost"
                     className="w-full justify-between p-3 h-auto hover:bg-muted/50"
-                    onClick={() => onToolSelect(tool.name)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToolSelect(tool.name)
+                    }}
                   >
                     <div className="flex items-center space-x-3 text-left">
                       <tool.icon className="w-5 h-5 text-muted-foreground group-hover:text-blue-500 transition-colors" />
@@ -108,7 +123,10 @@ export function ToolCard({ category, onToolSelect }: ToolCardProps) {
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => onToolSelect(category.title)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToolSelect(category.title)
+                }}
               >
                 Use {category.title}
                 <ArrowRight className="w-4 h-4 ml-2" />
