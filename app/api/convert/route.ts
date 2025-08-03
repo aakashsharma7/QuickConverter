@@ -4,19 +4,32 @@ import {
   convertVideoFormat, 
   extractAudioFromVideo,
   convertDocxToHtml,
-  convertDocxToText
+  convertDocxToText,
+  convertSvgToPng,
+  convertSvgToJpeg,
+  convertSvgToWebp,
+  convertToIco,
+  convertToFavicon,
+  convertToAppleTouchIcon,
+  convertToAndroidIcons,
+  createIconSet,
+  convertCodeFormat
 } from '@/lib/server-file-processing'
 import { 
   getFileExtension,
   isValidImageFormat,
   isValidVideoFormat,
   isValidAudioFormat,
-  isValidDocumentFormat
+  isValidDocumentFormat,
+  isValidIconFormat,
+  isValidVectorFormat,
+  isValidCodeFormat
 } from '@/lib/file-processing'
 
 export async function POST(request: NextRequest) {
   let file: File | null = null
   let targetFormat: string | null = null
+  const startTime = Date.now()
   
   try {
     const formData = await request.formData()
@@ -48,7 +61,8 @@ export async function POST(request: NextRequest) {
       isValidImage: isValidImageFormat(fileExtension),
       isValidVideo: isValidVideoFormat(fileExtension),
       isValidAudio: isValidAudioFormat(fileExtension),
-      isValidDocument: isValidDocumentFormat(fileExtension)
+      isValidDocument: isValidDocumentFormat(fileExtension),
+      isValidCode: isValidCodeFormat(fileExtension)
     })
     
     let result: Buffer
@@ -56,8 +70,40 @@ export async function POST(request: NextRequest) {
     
     // Determine file type and convert accordingly
     if (isValidImageFormat(fileExtension)) {
-      result = await convertImageFormat(buffer, targetFormat as any)
-      mimeType = `image/${targetFormat}`
+      // Handle SVG conversions
+      if (fileExtension === 'svg') {
+        switch (targetFormat) {
+          case 'png':
+            result = await convertSvgToPng(buffer)
+            mimeType = 'image/png'
+            break
+          case 'jpeg':
+          case 'jpg':
+            result = await convertSvgToJpeg(buffer)
+            mimeType = 'image/jpeg'
+            break
+          case 'webp':
+            result = await convertSvgToWebp(buffer)
+            mimeType = 'image/webp'
+            break
+          case 'ico':
+            result = await convertToIco(buffer)
+            mimeType = 'image/x-icon'
+            break
+          default:
+            result = await convertImageFormat(buffer, targetFormat as any)
+            mimeType = `image/${targetFormat}`
+        }
+      } else {
+        // Handle regular image to icon conversions
+        if (targetFormat === 'ico') {
+          result = await convertToIco(buffer)
+          mimeType = 'image/x-icon'
+        } else {
+          result = await convertImageFormat(buffer, targetFormat as any)
+          mimeType = `image/${targetFormat}`
+        }
+      }
     } else if (isValidVideoFormat(fileExtension)) {
       if (['mp3', 'wav', 'aac'].includes(targetFormat)) {
         result = await extractAudioFromVideo(buffer, targetFormat as any)
@@ -106,14 +152,57 @@ export async function POST(request: NextRequest) {
           error: `Document conversion not supported for ${fileExtension} files. Supported formats: .docx, .txt, .pdf` 
         }, { status: 400 })
       }
+    } else if (isValidCodeFormat(fileExtension)) {
+      // Handle code file conversions
+      result = await convertCodeFormat(buffer, fileExtension, targetFormat)
+      
+      // Set appropriate MIME type based on target format
+      switch (targetFormat) {
+        case 'html':
+          mimeType = 'text/html'
+          break
+        case 'js':
+          mimeType = 'application/javascript'
+          break
+        case 'ts':
+          mimeType = 'application/typescript'
+          break
+        case 'txt':
+          mimeType = 'text/plain'
+          break
+        default:
+          mimeType = 'text/plain'
+      }
     } else {
       return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 })
     }
     
+    // Track analytics
+    const processingTime = Date.now() - startTime
+    try {
+      await fetch(`${request.nextUrl.origin}/api/analytics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          originalFormat: fileExtension,
+          targetFormat,
+          fileSize: buffer.length,
+          processingTime,
+          success: true
+        })
+      })
+    } catch (error) {
+      console.warn('Failed to track analytics:', error)
+    }
+    
     // Create response with converted file
-    const response = new NextResponse(result)
-    response.headers.set('Content-Type', mimeType)
-    response.headers.set('Content-Disposition', `attachment; filename="${file.name.split('.')[0]}.${targetFormat}"`)
+    const response = new NextResponse(result.slice(), {
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Disposition': `attachment; filename="${file.name.split('.')[0]}.${targetFormat}"`
+      }
+    })
     
     return response
     
@@ -125,6 +214,27 @@ export async function POST(request: NextRequest) {
       type: file?.type,
       targetFormat
     })
+    
+    // Track failed conversion analytics
+    const processingTime = Date.now() - startTime
+    try {
+      await fetch(`${request.nextUrl.origin}/api/analytics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file?.name || 'unknown',
+          originalFormat: file ? getFileExtension(file.name) : 'unknown',
+          targetFormat: targetFormat || 'unknown',
+          fileSize: file?.size || 0,
+          processingTime,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
+      })
+    } catch (analyticsError) {
+      console.warn('Failed to track analytics:', analyticsError)
+    }
+    
     return NextResponse.json(
       { 
         error: 'Conversion failed', 
