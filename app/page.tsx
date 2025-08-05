@@ -524,9 +524,9 @@ export default function Dashboard() {
               >
                 <Zap className="w-6 h-6 text-blue-500" />
               </motion.div>
-              <link 
+              <Link 
                 href="https://skyframe-io.vercel.app/"
-                className="text-lg font-semibold text-gradient">QuickConvertor</link>
+                className="text-lg font-semibold text-gradient">QuickConvertor</Link>
             </motion.div>
 
             <motion.div
