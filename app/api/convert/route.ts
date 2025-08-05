@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { 
   convertImageFormat, 
+  convertImageToPdf,
   convertVideoFormat, 
   extractAudioFromVideo,
   convertDocxToHtml,
@@ -8,12 +9,15 @@ import {
   convertSvgToPng,
   convertSvgToJpeg,
   convertSvgToWebp,
+  convertSvgToIco,
+  convertIcoToSvg,
   convertToIco,
   convertToFavicon,
   convertToAppleTouchIcon,
   convertToAndroidIcons,
   createIconSet,
-  convertCodeFormat
+  convertCodeFormat,
+  removeWatermark
 } from '@/lib/server-file-processing'
 import { 
   getFileExtension,
@@ -65,12 +69,12 @@ export async function POST(request: NextRequest) {
       isValidCode: isValidCodeFormat(fileExtension)
     })
     
-    let result: Buffer
-    let mimeType: string
+    let result: Buffer = Buffer.from('')
+    let mimeType: string = 'application/octet-stream'
     
     // Determine file type and convert accordingly
-    if (isValidImageFormat(fileExtension)) {
-      // Handle SVG conversions
+    if (isValidIconFormat(fileExtension)) {
+      // Handle icon format conversions first (ICO, SVG)
       if (fileExtension === 'svg') {
         switch (targetFormat) {
           case 'png':
@@ -87,22 +91,62 @@ export async function POST(request: NextRequest) {
             mimeType = 'image/webp'
             break
           case 'ico':
-            result = await convertToIco(buffer)
+            result = await convertSvgToIco(buffer)
             mimeType = 'image/x-icon'
             break
           default:
             result = await convertImageFormat(buffer, targetFormat as any)
             mimeType = `image/${targetFormat}`
         }
-      } else {
-        // Handle regular image to icon conversions
-        if (targetFormat === 'ico') {
-          result = await convertToIco(buffer)
-          mimeType = 'image/x-icon'
-        } else {
-          result = await convertImageFormat(buffer, targetFormat as any)
-          mimeType = `image/${targetFormat}`
+      } else if (fileExtension === 'ico') {
+        // Handle ICO file conversions
+        switch (targetFormat) {
+          case 'png':
+            result = await convertImageFormat(buffer, 'png')
+            mimeType = 'image/png'
+            break
+          case 'jpeg':
+          case 'jpg':
+            result = await convertImageFormat(buffer, 'jpeg')
+            mimeType = 'image/jpeg'
+            break
+          case 'webp':
+            result = await convertImageFormat(buffer, 'webp')
+            mimeType = 'image/webp'
+            break
+          case 'svg':
+            console.log('Starting ICO to SVG conversion...')
+            try {
+              result = await convertIcoToSvg(buffer)
+              mimeType = 'image/svg+xml'
+              console.log('ICO to SVG conversion completed successfully')
+            } catch (error) {
+              console.error('ICO to SVG conversion failed:', error)
+              return NextResponse.json({ 
+                error: 'ICO to SVG conversion failed. ICO files are complex binary formats and may not be supported by all conversion tools. Try converting to PNG or JPEG instead.',
+                details: error instanceof Error ? error.message : 'Unknown error'
+              }, { status: 400 })
+            }
+            break
+          default:
+            return NextResponse.json({ error: `ICO conversion to ${targetFormat} is not supported` }, { status: 400 })
         }
+      }
+    } else if (isValidImageFormat(fileExtension)) {
+      // Handle regular image format conversions
+      if (targetFormat === 'watermark-removed') {
+        // Special case for watermark removal
+        result = await removeWatermark(buffer)
+        mimeType = 'image/png'
+      } else if (targetFormat === 'ico') {
+        result = await convertToIco(buffer)
+        mimeType = 'image/x-icon'
+      } else if (targetFormat === 'pdf') {
+        result = await convertImageToPdf(buffer)
+        mimeType = 'application/pdf'
+      } else {
+        result = await convertImageFormat(buffer, targetFormat as any)
+        mimeType = `image/${targetFormat}`
       }
     } else if (isValidVideoFormat(fileExtension)) {
       if (['mp3', 'wav', 'aac'].includes(targetFormat)) {
