@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  FileText, 
-  Image, 
-  Video, 
-  Settings, 
-  Upload, 
+import Link from 'next/link'
+import {
+  FileText,
+  Image,
+  Video,
+  Settings,
+  Upload,
   Download,
   File,
   Zap,
@@ -53,6 +54,9 @@ const toolCategories = [
     color: 'from-green-500 to-teal-500',
     tools: [
       { name: 'Format Converter', description: 'JPG, PNG, WebP, and more', icon: Image },
+      { name: 'Image to PDF', description: 'Convert JPG, PNG, WebP, TIFF to PDF', icon: FileText },
+      { name: 'SVG to ICO', description: 'Convert SVG files to ICO format', icon: Image },
+      { name: 'ICO to SVG', description: 'Convert ICO files to SVG format', icon: Image },
       { name: 'Background Remover', description: 'Remove image backgrounds', icon: Image },
       { name: 'Watermark Remover', description: 'Remove watermarks from images', icon: Shield },
       { name: 'Image Compressor', description: 'Reduce file size while maintaining quality', icon: Zap },
@@ -90,6 +94,7 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState<string>('')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showConversionModal, setShowConversionModal] = useState(false)
   const [showAnalytics, setShowAnalytics] = useState(false)
@@ -99,14 +104,16 @@ export default function Dashboard() {
   const handleFileUpload = async (files: File[]) => {
     setIsUploading(true)
     setUploadProgress(0)
-    
-    // Simulate upload progress
+    setUploadStatus('uploading')
+
+    // Simulate upload progress with more realistic timing
     const interval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval)
           setIsUploading(false)
           setUploadedFiles(files)
+          setUploadStatus('completed')
           setShowConversionModal(true)
           toast({
             title: "Upload Complete!",
@@ -114,9 +121,15 @@ export default function Dashboard() {
           })
           return 100
         }
-        return prev + 10
+
+        // More realistic progress simulation
+        let increment = Math.random() * 20 + 10 // 10-30% increments
+        if (prev > 80) {
+          increment = Math.random() * 8 + 2 // Slower progress near completion
+        }
+        return Math.min(prev + increment, 100)
       })
-    }, 200)
+    }, 150 + Math.random() * 200) // Random interval between 150-350ms
   }
 
   const handleToolSelect = (toolName: string) => {
@@ -125,9 +138,9 @@ export default function Dashboard() {
       title: "Tool Selected",
       description: `${toolName} is ready to use!`,
       action: (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => {
             // Here you would typically navigate to the tool or open a modal
             setShowConversionModal(true)
@@ -146,17 +159,17 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       {/* Header */}
-      <header className="sticky top-0 z-50 glass dark:glass-dark border-b border-white/20">
+        <header className="sticky top-4 z-50 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border border-white/20 shadow-lg rounded-2xl mx-4">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center space-x-3"
             >
-              <motion.div 
+              <motion.div
                 className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center"
-                whileHover={{ 
+                whileHover={{
                   scale: 1.05,
                   rotate: 5,
                   boxShadow: "0 10px 25px rgba(59, 130, 246, 0.3)"
@@ -165,11 +178,11 @@ export default function Dashboard() {
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     rotate: [0, 10, -10, 0],
                     scale: [1, 1.1, 1]
                   }}
-                  transition={{ 
+                  transition={{
                     duration: 2,
                     repeat: Infinity,
                     repeatType: "reverse",
@@ -180,12 +193,12 @@ export default function Dashboard() {
                 </motion.div>
               </motion.div>
               <div>
-                <motion.h1 
+                <motion.h1
                   className="text-2xl font-bold text-gradient"
                   initial={{ opacity: 0, y: -10, scale: 0.9 }}
-                  animate={{ 
-                    opacity: 1, 
-                    y: 0, 
+                  animate={{
+                    opacity: 1,
+                    y: 0,
                     scale: 1,
                     textShadow: [
                       "0 0 5px rgba(59, 130, 246, 0.2)",
@@ -193,9 +206,9 @@ export default function Dashboard() {
                       "0 0 5px rgba(59, 130, 246, 0.2)"
                     ]
                   }}
-                  transition={{ 
-                    delay: 0.2, 
-                    duration: 0.6, 
+                  transition={{
+                    delay: 0.2,
+                    duration: 0.6,
                     ease: "easeOut",
                     textShadow: {
                       duration: 2,
@@ -203,19 +216,19 @@ export default function Dashboard() {
                       ease: "easeInOut"
                     }
                   }}
-                  whileHover={{ 
+                  whileHover={{
                     scale: 1.05,
                     textShadow: "0 0 15px rgba(59, 130, 246, 0.4)"
                   }}
                 >
                   QuickConvertor
                 </motion.h1>
-                <motion.p 
+                <motion.p
                   className="text-sm text-muted-foreground"
                   initial={{ opacity: 0, y: 10, x: -5 }}
                   animate={{ opacity: 1, y: 0, x: 0 }}
                   transition={{ delay: 0.3, duration: 0.6, ease: "easeOut" }}
-                  whileHover={{ 
+                  whileHover={{
                     scale: 1.02,
                     color: "hsl(var(--foreground))"
                   }}
@@ -224,7 +237,6 @@ export default function Dashboard() {
                 </motion.p>
               </div>
             </motion.div>
-
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
@@ -236,16 +248,15 @@ export default function Dashboard() {
                 <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 <span className="sr-only">Toggle theme</span>
               </Button>
-              
-              <Button 
-                variant="outline" 
+
+              <Button
+                variant="outline"
                 onClick={() => setShowAnalytics(true)}
                 className="hidden sm:flex"
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Analytics
               </Button>
-              
               <Button variant="gradient" className="hidden sm:flex">
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Files
@@ -255,9 +266,9 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pt-8">
         {/* Hero Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
@@ -273,23 +284,35 @@ export default function Dashboard() {
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
             Professional-grade file conversion tools. Convert PDFs, images, videos, and more with our advanced processing engine.
           </p>
-          
+
           {/* Upload Zone */}
-          <div className="max-w-2xl mx-auto mb-8">
-            <FileUploadZone 
-              onUpload={handleFileUpload}
+          <motion.div
+            className="max-w-2xl mx-auto mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6, ease: "easeOut" }}
+            whileHover={{
+              scale: 1.02,
+              transition: { duration: 0.2 }
+            }}
+          >
+            <FileUploadZone
+              onFilesSelected={handleFileUpload}
               isUploading={isUploading}
-              progress={uploadProgress}
+              uploadProgress={uploadProgress}
+              uploadStatus={uploadStatus}
             />
-          </div>
+          </motion.div>
+
+
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass dark:glass-dark p-6 rounded-xl"
-              whileHover={{ 
+              className="backdrop-blur-md bg-white/60 dark:bg-slate-800/60 border border-white/20 dark:border-slate-700/20 p-6 rounded-xl shadow-lg"
+              whileHover={{
                 scale: 1.05,
                 y: -5,
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)"
@@ -297,11 +320,11 @@ export default function Dashboard() {
               transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 20 }}
             >
               <motion.div
-                animate={{ 
+                animate={{
                   rotate: [0, 5, -5, 0],
                   scale: [1, 1.1, 1]
                 }}
-                transition={{ 
+                transition={{
                   duration: 3,
                   repeat: Infinity,
                   repeatType: "reverse",
@@ -310,7 +333,7 @@ export default function Dashboard() {
               >
                 <Zap className="w-8 h-8 text-blue-500 mx-auto mb-3" />
               </motion.div>
-              <motion.h3 
+              <motion.h3
                 className="text-2xl font-bold mb-1"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400 }}
@@ -319,12 +342,12 @@ export default function Dashboard() {
               </motion.h3>
               <p className="text-muted-foreground">Process files in seconds</p>
             </motion.div>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass dark:glass-dark p-6 rounded-xl"
-              whileHover={{ 
+              className="backdrop-blur-md bg-white/60 dark:bg-slate-800/60 border border-white/20 dark:border-slate-700/20 p-6 rounded-xl shadow-lg"
+              whileHover={{
                 scale: 1.05,
                 y: -5,
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)"
@@ -332,11 +355,11 @@ export default function Dashboard() {
               transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
             >
               <motion.div
-                animate={{ 
+                animate={{
                   scale: [1, 1.2, 1],
                   rotate: [0, 10, 0]
                 }}
-                transition={{ 
+                transition={{
                   duration: 2,
                   repeat: Infinity,
                   repeatType: "reverse",
@@ -345,7 +368,7 @@ export default function Dashboard() {
               >
                 <Shield className="w-8 h-8 text-green-500 mx-auto mb-3" />
               </motion.div>
-              <motion.h3 
+              <motion.h3
                 className="text-2xl font-bold mb-1"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400 }}
@@ -354,12 +377,12 @@ export default function Dashboard() {
               </motion.h3>
               <p className="text-muted-foreground">Your files are protected</p>
             </motion.div>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass dark:glass-dark p-6 rounded-xl"
-              whileHover={{ 
+              className="backdrop-blur-md bg-white/60 dark:bg-slate-800/60 border border-white/20 dark:border-slate-700/20 p-6 rounded-xl shadow-lg"
+              whileHover={{
                 scale: 1.05,
                 y: -5,
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)"
@@ -367,11 +390,11 @@ export default function Dashboard() {
               transition={{ delay: 0.3, type: "spring", stiffness: 300, damping: 20 }}
             >
               <motion.div
-                animate={{ 
+                animate={{
                   scale: [1, 1.1, 1],
                   rotate: [0, -5, 5, 0]
                 }}
-                transition={{ 
+                transition={{
                   duration: 2.5,
                   repeat: Infinity,
                   repeatType: "reverse",
@@ -380,7 +403,7 @@ export default function Dashboard() {
               >
                 <CheckCircle className="w-8 h-8 text-purple-500 mx-auto mb-3" />
               </motion.div>
-              <motion.h3 
+              <motion.h3
                 className="text-2xl font-bold mb-1"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400 }}
@@ -392,192 +415,106 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Tool Categories */}
-        <section className="mb-12">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
-          >
-            <motion.h3 
-              className="text-3xl font-bold mb-4"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.6 }}
-              whileHover={{ 
-                scale: 1.02,
-                textShadow: "0 0 10px rgba(59, 130, 246, 0.3)"
-              }}
-            >
-              Choose Your Tool
-            </motion.h3>
-            <motion.p 
-              className="text-muted-foreground"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              whileHover={{ 
-                scale: 1.01,
-                color: "hsl(var(--foreground))"
-              }}
-            >
-              Select from our comprehensive suite of conversion tools
-            </motion.p>
-          </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {toolCategories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <ToolCard
-                  category={category}
-                  onToolSelect={handleToolSelect}
-                />
-              </motion.div>
-            ))}
-          </div>
-        </section>
 
         {/* Features Section */}
-        <section className="mb-12">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
-          >
-            <motion.h3 
-              className="text-3xl font-bold mb-4"
-              initial={{ opacity: 0, y: 10 }}
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.6 }}
-              whileHover={{ 
-                scale: 1.02,
-                textShadow: "0 0 10px rgba(59, 130, 246, 0.3)"
-              }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
             >
-              Why Choose QuickConvertor?
-            </motion.h3>
-            <motion.p 
-              className="text-muted-foreground"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              whileHover={{ 
-                scale: 1.01,
-                color: "hsl(var(--foreground))"
-              }}
-            >
-              Built for professionals, designed for everyone
-            </motion.p>
-          </motion.div>
+              <h2 className="text-3xl font-bold mb-4">Why Choose QuickConverter?</h2>
+              <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                Experience lightning-fast file conversions with our advanced processing engine
+              </p>
+            </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: Zap,
-                title: "Lightning Fast Processing",
-                description: "Advanced algorithms ensure your files are processed in seconds, not minutes."
-              },
-              {
-                icon: Shield,
-                title: "Enterprise Security",
-                description: "Your files are encrypted and automatically deleted after processing."
-              },
-              {
-                icon: Download,
-                title: "Batch Processing",
-                description: "Convert multiple files at once with our powerful batch processing engine."
-              },
-              {
-                icon: File,
-                title: "100+ File Formats",
-                description: "Support for virtually every file format you'll ever need."
-              },
-              {
-                icon: Clock,
-                title: "24/7 Availability",
-                description: "Our platform is always available when you need it most."
-              },
-              {
-                icon: CheckCircle,
-                title: "Quality Guaranteed",
-                description: "We maintain the highest quality standards for all conversions."
-              }
-            ].map((feature, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="h-full tool-card">
-                  <CardHeader>
-                    <feature.icon className="w-8 h-8 text-blue-500 mb-2" />
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>{feature.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                {
+                  title: "Lightning Fast Processing",
+                  description: "Advanced algorithms ensure your files are processed in seconds, not minutes.",
+                  icon: Zap
+                },
+                {
+                  title: "Enterprise Security",
+                  description: "Your files are encrypted and automatically deleted after processing.",
+                  icon: Shield
+                },
+                {
+                  title: "Batch Processing",
+                  description: "Convert multiple files at once with our powerful batch processing engine.",
+                  icon: Download
+                },
+                {
+                  title: "100+ File Formats",
+                  description: "Our platform offers comprehensive support for a wide variety of image file formats.",
+                  icon: File
+                },
+                {
+                  title: "24/7 Availability",
+                  description: "Our platform is always available when you need it most.",
+                  icon: Clock
+                },
+                {
+                  title: "Quality Guaranteed",
+                  description: "We maintain the highest quality standards for all conversions.",
+                  icon: CheckCircle
+                }
+              ].map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  whileHover={{ y: -5, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Card className="group h-full hover:shadow-lg transition-all duration-300">
+                    <CardHeader className="text-center">
+                      <motion.div
+                        className="w-12 h-12 mx-auto mb-4 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
+                        whileHover={{ rotate: 360, scale: 1.1 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <feature.icon className="w-6 h-6 text-white" />
+                      </motion.div>
+                      <CardTitle className="group-hover:text-blue-600 transition-colors">
+                        {feature.title}
+                      </CardTitle>
+                      <CardDescription className="group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
+                        {feature.description}
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* CTA Section */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <Card className="glass dark:glass-dark p-8">
-            <CardHeader>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.6 }}
-              >
-                <CardTitle className="text-3xl mb-4">Ready to Get Started?</CardTitle>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.6 }}
-              >
-                <CardDescription className="text-lg">
-                  Join thousands of professionals who trust QuickConvertor for their file conversion needs.
-                </CardDescription>
-              </motion.div>
-            </CardHeader>
-            <CardContent>
-              <Button size="lg" variant="gradient" className="mr-4">
-                Start Converting Now
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-              <Button size="lg" variant="outline">
-                Learn More
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.section>
+
+
+
+
+
       </main>
 
       {/* Footer */}
       <footer className="bg-background/80 backdrop-blur-sm border-t border-border/50 mt-16">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.6 }}
               className="flex items-center space-x-2"
             >
               <motion.div
-                whileHover={{ 
+                whileHover={{
                   scale: 1.1,
                   rotate: 5,
                   boxShadow: "0 5px 15px rgba(59, 130, 246, 0.3)"
@@ -590,7 +527,7 @@ export default function Dashboard() {
               <span className="text-lg font-semibold text-gradient">QuickConvertor</span>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.6 }}
@@ -601,7 +538,7 @@ export default function Dashboard() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors"
-                whileHover={{ 
+                whileHover={{
                   scale: 1.05,
                   color: "hsl(var(--foreground))"
                 }}
@@ -609,14 +546,14 @@ export default function Dashboard() {
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
                 <motion.div
-                  whileHover={{ 
+                  whileHover={{
                     rotate: 360,
                     scale: 1.2
                   }}
-                  transition={{ 
-                    type: "spring", 
-                    stiffness: 300, 
-                    damping: 20 
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 20
                   }}
                 >
                   <Github className="w-5 h-5" />
@@ -641,7 +578,7 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.6 }}
@@ -670,7 +607,7 @@ export default function Dashboard() {
                 <X className="w-5 h-5" />
               </Button>
             </div>
-            
+
             {/* Content */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               <AnalyticsDashboard />
