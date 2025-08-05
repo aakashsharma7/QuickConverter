@@ -1,269 +1,232 @@
 "use client"
 
-import { useState, useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, File, X, AlertCircle, HelpCircle, Sparkles, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { formatFileSize } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { ConversionProgress } from '@/components/conversion-progress'
 
 interface FileUploadZoneProps {
-  onUpload: (files: File[]) => void
+  onFilesSelected: (files: File[]) => void
   isUploading?: boolean
-  progress?: number
-  maxFiles?: number
-  maxSize?: number
-  acceptedTypes?: string[]
+  uploadProgress?: number
+  uploadStatus?: string
 }
 
-export function FileUploadZone({
-  onUpload,
-  isUploading = false,
-  progress = 0,
-  maxFiles = 10,
-  maxSize = 100 * 1024 * 1024, // 100MB
-  acceptedTypes = ['*/*']
+export function FileUploadZone({ 
+  onFilesSelected, 
+  isUploading = false, 
+  uploadProgress = 0, 
+  uploadStatus = '' 
 }: FileUploadZoneProps) {
-  const [files, setFiles] = useState<File[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<string[]>([])
 
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles])
+    setSelectedFiles(acceptedFiles)
+    setErrors([])
     
-    // Handle rejected files
-    const newErrors = rejectedFiles.map(({ file, errors }) => {
-      if (errors.some((e: { code: string }) => e.code === 'file-too-large')) {
-        return `${file.name} is too large`
-      }
-      if (errors.some((e: { code: string }) => e.code === 'file-invalid-type')) {
-        return `${file.name} has an invalid type`
-      }
-      return `${file.name} was rejected`
-    })
-    
-    setErrors(prev => [...prev, ...newErrors])
+    if (rejectedFiles.length > 0) {
+      const errorMessages = rejectedFiles.map(({ file, errors }) => {
+        const errorTypes = errors.map((e: any) => e.code).join(', ')
+        return `${file.name}: ${errorTypes}`
+      })
+      setErrors(errorMessages)
+    }
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    maxFiles,
-    maxSize,
-    accept: acceptedTypes.reduce((acc, type) => ({ ...acc, [type]: [] }), {}),
-    disabled: isUploading
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff'],
+      'video/*': ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'],
+      'audio/*': ['.mp3', '.wav', '.flac', '.aac', '.ogg'],
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt'],
+      'text/html': ['.html', '.htm'],
+      'text/css': ['.css'],
+      'text/javascript': ['.js'],
+      'application/json': ['.json'],
+      'text/xml': ['.xml'],
+      'application/zip': ['.zip'],
+      'application/x-rar-compressed': ['.rar']
+    },
+    maxSize: 50 * 1024 * 1024, // 50MB
+    multiple: true
   })
 
+  const handleUpload = () => {
+    if (selectedFiles.length > 0) {
+      onFilesSelected(selectedFiles)
+    }
+  }
+
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index))
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const removeError = (index: number) => {
     setErrors(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleUpload = () => {
-    if (files.length > 0) {
-      onUpload(files)
-      setFiles([])
-      setErrors([])
-    }
-  }
-
   return (
-    <div className="space-y-4">
-      {/* Upload Zone */}
-      <div {...getRootProps()}>
-        <motion.div
-          className={`upload-zone cursor-pointer transition-all duration-300 ${
-            isDragActive ? 'dragover' : ''
-          } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
+    <div className="space-y-6">
+      {/* Main Upload Zone */}
+      <div
+        {...getRootProps()}
+        className={`upload-zone relative p-8 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all duration-300 hover:scale-[1.02] ${
+          isDragActive 
+            ? 'border-blue-400 bg-blue-50/20 dark:bg-blue-900/20 scale-105' 
+            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+        }`}
+      >
         <input {...getInputProps()} />
         
-        <div className="text-center">
-          <motion.div
-            animate={isDragActive ? { scale: 1.1 } : { scale: 1 }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.div
-              animate={{ 
-                y: [0, -10, 0],
-                rotate: [0, 5, -5, 0]
-              }}
-              transition={{ 
-                duration: 3,
-                repeat: Infinity,
-                repeatType: "reverse",
-                ease: "easeInOut"
-              }}
-            >
-              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            </motion.div>
-          </motion.div>
-          
-          <motion.h3 
-            className="text-lg font-semibold mb-2"
-            animate={{ 
-              scale: isDragActive ? 1.05 : 1,
-              color: isDragActive ? "#3b82f6" : "inherit"
-            }}
-            transition={{ duration: 0.2 }}
-          >
-            {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
-          </motion.h3>
-          
-          <p className="text-muted-foreground mb-4">
-            or click to browse files
+        {/* Main Upload Icon */}
+        <div className="flex justify-center mb-4">
+          <Upload className="w-12 h-12 text-gray-400 dark:text-gray-500 animate-pulse" />
+        </div>
+
+        {/* Main Heading */}
+        <h3 className="text-xl font-semibold mb-2 text-gray-700 dark:text-gray-300">
+          {isDragActive ? 'Drop files here!' : 'Drag & drop files here'}
+        </h3>
+
+        {/* Interactive Microcopy */}
+        <div className="space-y-3 mb-6">
+          <p className="text-gray-600 dark:text-gray-400">
+            or{' '}
+            <span className="text-blue-500 hover:text-blue-600 cursor-pointer font-medium">
+              browse files
+            </span>
           </p>
           
-          <div className="text-sm text-muted-foreground">
-            <p>Max {maxFiles} files, up to {formatFileSize(maxSize)} each</p>
-            <p>Supports: {acceptedTypes.join(', ')}</p>
+          <div className="flex items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-1">
+              <Sparkles className="w-4 h-4" />
+              <span>50+ formats supported</span>
+              <HelpCircle className="w-4 h-4 ml-1 cursor-help opacity-60 hover:opacity-100" />
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Zap className="w-4 h-4" />
+              <span>Up to 50MB per file</span>
+              <HelpCircle className="w-4 h-4 ml-1 cursor-help opacity-60 hover:opacity-100" />
+            </div>
           </div>
         </div>
-      </motion.div>
+
+        {/* Progress Display */}
+        {isUploading && (
+          <div className="mb-4">
+            <ConversionProgress
+              fileName="Uploading files..."
+              progress={uploadProgress}
+              status={uploadStatus as 'uploading' | 'converting' | 'completed' | 'error'}
+            />
+          </div>
+        )}
+
+        {/* Empty State Illustration */}
+        {selectedFiles.length === 0 && !isUploading && (
+          <div className="mt-6 text-gray-400 dark:text-gray-500">
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-1 text-xs">
+                <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+              <p className="text-xs">Drop files here to get started</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Progress Bar */}
-      <AnimatePresence>
-        {isUploading && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-2"
-          >
-            <div className="flex justify-between text-sm">
-              <span>Uploading...</span>
-              <span>{progress}%</span>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Selected Files */}
-      <AnimatePresence>
-        {files.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-2"
-          >
-            <h4 className="font-medium">Selected Files ({files.length})</h4>
-            <div className="space-y-2">
-              {files.map((file, index) => (
-                <motion.div
-                  key={`${file.name}-${index}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+      {selectedFiles.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <File className="w-4 h-4" />
+            Selected Files ({selectedFiles.length})
+            <HelpCircle className="w-4 h-4 cursor-help opacity-60 hover:opacity-100" />
+          </h4>
+          <div className="space-y-2">
+            {selectedFiles.map((file, index) => (
+              <div
+                key={file.name}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <File className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{file.name}</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeFile(index)
+                  }}
+                  className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900/20"
                 >
-                  <div className="flex items-center space-x-3">
-                    <File className="w-5 h-5 text-blue-500" />
-                    <div>
-                      <p className="font-medium text-sm">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(index)}
-                    disabled={isUploading}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Errors */}
-      <AnimatePresence>
-        {errors.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-2"
-          >
-            <h4 className="font-medium text-destructive">Errors</h4>
-            <div className="space-y-2">
-              {errors.map((error, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
+      {errors.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            Errors ({errors.length})
+            <HelpCircle className="w-4 h-4 cursor-help opacity-60 hover:opacity-100" />
+          </h4>
+          <div className="space-y-2">
+            {errors.map((error, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-md"
+              >
+                <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeError(index)
+                  }}
+                  className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900/40"
                 >
-                  <div className="flex items-center space-x-3">
-                    <AlertCircle className="w-5 h-5 text-destructive" />
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeError(index)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upload Button */}
-      <AnimatePresence>
-        {files.length > 0 && !isUploading && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="flex justify-center"
+      {selectedFiles.length > 0 && !isUploading && (
+        <div className="flex justify-center">
+          <Button
+            onClick={handleUpload}
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
           >
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400 }}
-            >
-              <Button
-                onClick={handleUpload}
-                size="lg"
-                variant="gradient"
-                className="px-8"
-              >
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.1, 1],
-                    rotate: [0, 5, 0]
-                  }}
-                  transition={{ 
-                    duration: 2,
-                    repeat: Infinity,
-                    repeatType: "reverse",
-                    ease: "easeInOut"
-                  }}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                </motion.div>
-                Upload {files.length} File{files.length !== 1 ? 's' : ''}
-              </Button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <Upload className="w-4 h-4 mr-2 animate-pulse" />
+            Upload {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''}
+          </Button>
+        </div>
+      )}
     </div>
   )
 } 
