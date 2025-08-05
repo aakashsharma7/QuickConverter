@@ -253,7 +253,11 @@ export function getFileExtension(filename: string): string {
 }
 
 export function isValidImageFormat(format: string): boolean {
-  return ['jpeg', 'jpg', 'png', 'webp', 'avif', 'gif', 'svg'].includes(format)
+  return ['jpeg', 'jpg', 'png', 'webp', 'avif', 'gif', 'svg', 'ico', 'tiff'].includes(format)
+}
+
+export function isWatermarkRemovalFormat(format: string): boolean {
+  return format === 'watermark-removed'
 }
 
 export function isValidIconFormat(format: string): boolean {
