@@ -456,7 +456,7 @@ export default function Dashboard() {
                 },
                 {
                   title: "24/7 Availability",
-                  description: "Our platform is always available when you need it most.",
+                  description: "No matter the time or situation, our platform is built to be there for you when you need it most",
                   icon: Clock
                 },
                 {
