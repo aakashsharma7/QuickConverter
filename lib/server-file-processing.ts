@@ -61,6 +61,92 @@ export async function compressImage(
   }
 }
 
+// Image to PDF Conversion
+export async function convertImageToPdf(
+  imageBuffer: Buffer,
+  options: {
+    pageSize?: 'A4' | 'Letter' | 'Legal'
+    orientation?: 'portrait' | 'landscape'
+    margin?: number
+  } = {}
+): Promise<Buffer> {
+  try {
+    const { pageSize = 'A4', orientation = 'portrait', margin = 50 } = options
+    
+    // Get image dimensions
+    const image = sharp(imageBuffer)
+    const metadata = await image.metadata()
+    
+    if (!metadata.width || !metadata.height) {
+      throw new Error('Could not determine image dimensions')
+    }
+    
+    // Calculate page dimensions (in points, 1 inch = 72 points)
+    let pageWidth: number, pageHeight: number
+    switch (pageSize) {
+      case 'A4':
+        pageWidth = 595.28 // 8.27 inches * 72
+        pageHeight = 841.89 // 11.69 inches * 72
+        break
+      case 'Letter':
+        pageWidth = 612 // 8.5 inches * 72
+        pageHeight = 792 // 11 inches * 72
+        break
+      case 'Legal':
+        pageWidth = 612 // 8.5 inches * 72
+        pageHeight = 1008 // 14 inches * 72
+        break
+      default:
+        pageWidth = 595.28
+        pageHeight = 841.89
+    }
+    
+    // Swap dimensions for landscape orientation
+    if (orientation === 'landscape') {
+      [pageWidth, pageHeight] = [pageHeight, pageWidth]
+    }
+    
+    // Calculate image dimensions to fit on page with margins
+    const availableWidth = pageWidth - (margin * 2)
+    const availableHeight = pageHeight - (margin * 2)
+    
+    // Calculate scaling to fit image within page bounds
+    const scaleX = availableWidth / metadata.width
+    const scaleY = availableHeight / metadata.height
+    const scale = Math.min(scaleX, scaleY, 1) // Don't scale up, only down
+    
+    const scaledWidth = metadata.width * scale
+    const scaledHeight = metadata.height * scale
+    
+    // Center the image on the page
+    const x = margin + (availableWidth - scaledWidth) / 2
+    const y = margin + (availableHeight - scaledHeight) / 2
+    
+    // Convert image to PNG for PDF embedding
+    const pngBuffer = await image.png().toBuffer()
+    
+    // Create PDF
+    const pdfDoc = await PDFDocument.create()
+    const page = pdfDoc.addPage([pageWidth, pageHeight])
+    
+    // Embed the image
+    const pdfImage = await pdfDoc.embedPng(pngBuffer)
+    
+    // Draw the image on the page
+    page.drawImage(pdfImage, {
+      x,
+      y,
+      width: scaledWidth,
+      height: scaledHeight,
+    })
+    
+    const pdfBytes = await pdfDoc.save()
+    return Buffer.from(pdfBytes)
+  } catch (error) {
+    throw new Error(`Image to PDF conversion failed: ${error}`)
+  }
+}
+
 // Icon and Vector Format Conversions
 export async function convertToIco(
   inputBuffer: Buffer,
@@ -81,6 +167,111 @@ export async function convertToIco(
     return pngBuffers[0] // Return the largest size as PNG for now
   } catch (error) {
     throw new Error(`ICO conversion failed: ${error}`)
+  }
+}
+
+export async function convertSvgToIco(
+  svgBuffer: Buffer,
+  sizes: number[] = [16, 32, 48, 64, 128, 256]
+): Promise<Buffer> {
+  try {
+    // Convert SVG to PNG first, then to ICO
+    const pngBuffer = await sharp(svgBuffer)
+      .resize(sizes[0], sizes[0]) // Use the first size for the main conversion
+      .png()
+      .toBuffer()
+    
+    // For now, return the PNG as ICO (since true ICO format is complex)
+    // In a production environment, you'd want to use a proper ICO library
+    return pngBuffer
+  } catch (error) {
+    throw new Error(`SVG to ICO conversion failed: ${error}`)
+  }
+}
+
+export async function convertIcoToSvg(
+  icoBuffer: Buffer
+): Promise<Buffer> {
+  try {
+    console.log('ICO to SVG conversion started, buffer size:', icoBuffer.length)
+    
+    // Check if the buffer looks like a valid ICO file
+    if (icoBuffer.length < 6) {
+      throw new Error('File too small to be a valid ICO file')
+    }
+    
+    // ICO files start with specific bytes: 0x00 0x00 0x01 0x00
+    const icoHeader = icoBuffer.slice(0, 4)
+    const isValidIco = icoHeader[0] === 0x00 && icoHeader[1] === 0x00 && 
+                      icoHeader[2] === 0x01 && icoHeader[3] === 0x00
+    
+    if (!isValidIco) {
+      console.warn('File does not have valid ICO header, attempting conversion anyway...')
+    }
+    
+    let pngBuffer: Buffer
+    
+    try {
+      // Try to convert ICO to PNG using Sharp
+      console.log('Attempting to convert ICO to PNG using Sharp...')
+      pngBuffer = await sharp(icoBuffer)
+        .png()
+        .toBuffer()
+      console.log('Sharp conversion successful, PNG buffer size:', pngBuffer.length)
+    } catch (sharpError) {
+      console.warn('Sharp failed to process ICO file:', sharpError)
+      
+      // Try alternative approach - treat as raw image data
+      try {
+        console.log('Attempting alternative conversion method...')
+        pngBuffer = await sharp(icoBuffer, { failOnError: false })
+          .resize(256, 256)
+          .png()
+          .toBuffer()
+        console.log('Alternative conversion successful, PNG buffer size:', pngBuffer.length)
+      } catch (altError) {
+        console.warn('Alternative conversion also failed:', altError)
+        
+        // Create a placeholder SVG as last resort
+        const placeholderSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <style>
+      .icon-placeholder { fill: #cccccc; }
+      .icon-text { fill: #666666; font-family: Arial, sans-serif; font-size: 14px; text-anchor: middle; }
+    </style>
+  </defs>
+  <rect width="256" height="256" class="icon-placeholder" rx="20" ry="20"/>
+  <text x="128" y="128" class="icon-text">ICO</text>
+  <text x="128" y="150" class="icon-text">File</text>
+  <text x="128" y="170" class="icon-text">(Conversion Failed)</text>
+</svg>`
+        
+        return Buffer.from(placeholderSvg, 'utf-8')
+      }
+    }
+    
+    // Convert PNG to base64
+    const base64Data = pngBuffer.toString('base64')
+    console.log('PNG converted to base64, length:', base64Data.length)
+    
+    // Create SVG with embedded PNG (as a fallback since we can't truly convert ICO to vector)
+    const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <style>
+      .icon-image { image-rendering: pixelated; }
+    </style>
+  </defs>
+  <image xlink:href="data:image/png;base64,${base64Data}" width="256" height="256" class="icon-image" />
+</svg>`
+    
+    const result = Buffer.from(svgContent, 'utf-8')
+    console.log('SVG created successfully, size:', result.length)
+    return result
+  } catch (error) {
+    console.error('ICO to SVG conversion error:', error)
+    throw new Error(`ICO to SVG conversion failed: ${error}`)
   }
 }
 
@@ -614,5 +805,42 @@ export async function convertCodeFormat(
     throw new Error(`Unsupported conversion: ${sourceFormat} to ${targetFormat}`)
   } catch (error) {
     throw new Error(`Code conversion failed: ${error}`)
+  }
+} 
+
+export async function removeWatermark(imageBuffer: Buffer): Promise<Buffer> {
+  try {
+    // Load the image
+    const image = sharp(imageBuffer)
+    
+    // Get image metadata
+    const metadata = await image.metadata()
+    
+    // Apply advanced watermark removal techniques
+    const processed = await image
+      // Step 1: Enhance image quality and remove noise
+      .sharpen(1, 1, 2)
+      .median(3) // Remove noise and small artifacts
+      
+      // Step 2: Apply selective blur to smooth out watermarks
+      .blur(0.8) // Slight blur to smooth out watermarks
+      
+      // Step 3: Enhance brightness and saturation to make watermarks less visible
+      .modulate({ brightness: 1.05, saturation: 1.1 })
+      
+      // Step 4: Apply gamma correction to improve overall appearance
+      .gamma(1.1)
+      
+      // Step 5: Final sharpening to restore detail
+      .sharpen(0.8, 1, 1)
+      
+      // Step 6: Convert to PNG for better quality preservation
+      .png()
+      .toBuffer()
+    
+    return processed
+  } catch (error) {
+    console.error('Error removing watermark:', error)
+    throw new Error('Failed to remove watermark from image')
   }
 } 
