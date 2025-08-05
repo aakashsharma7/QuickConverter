@@ -6,7 +6,7 @@ import { X, Download, File, CheckCircle, AlertCircle, Loader2 } from 'lucide-rea
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
+import { ConversionProgress } from '@/components/conversion-progress'
 import { useToast } from '@/hooks/use-toast'
 import { 
   getFileExtension,
@@ -32,6 +32,8 @@ interface ConversionJob {
   error?: string
   downloadedAt?: number
   isMarkedForRemoval?: boolean
+  completedAt?: number
+  autoRemoveCountdown?: number
 }
 
 const formatOptions = {
@@ -40,13 +42,21 @@ const formatOptions = {
     { value: 'png', label: 'PNG (.png)', icon: '🖼️' },
     { value: 'webp', label: 'WebP (.webp)', icon: '🖼️' },
     { value: 'avif', label: 'AVIF (.avif)', icon: '🖼️' },
-    { value: 'ico', label: 'ICO (.ico)', icon: '🎯' }
+    { value: 'ico', label: 'ICO (.ico)', icon: '🎯' },
+    { value: 'pdf', label: 'PDF (.pdf)', icon: '📄' },
+    { value: 'watermark-removed', label: 'Remove Watermark', icon: '🚫' }
   ],
   svg: [
     { value: 'png', label: 'PNG (.png)', icon: '🖼️' },
     { value: 'jpeg', label: 'JPEG (.jpg)', icon: '🖼️' },
     { value: 'webp', label: 'WebP (.webp)', icon: '🖼️' },
     { value: 'ico', label: 'ICO (.ico)', icon: '🎯' }
+  ],
+  ico: [
+    { value: 'png', label: 'PNG (.png)', icon: '🖼️' },
+    { value: 'jpeg', label: 'JPEG (.jpg)', icon: '🖼️' },
+    { value: 'webp', label: 'WebP (.webp)', icon: '🖼️' },
+    { value: 'svg', label: 'SVG (.svg) - Limited support', icon: '📐' }
   ],
   video: [
     { value: 'mp4', label: 'MP4 (.mp4)', icon: '🎥' },
@@ -79,16 +89,28 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
   const [countdown, setCountdown] = useState(0)
   const { toast } = useToast()
 
-  // Cleanup effect to remove downloaded files after 10 seconds
+  // Cleanup effect to remove downloaded files and update countdown
   React.useEffect(() => {
     const cleanupInterval = setInterval(() => {
       const now = Date.now()
       setCountdown(now)
       
       setConversionJobs(prev => {
-        const updatedJobs = prev.filter(job => {
+        const updatedJobs = prev.map(job => {
+          // Update countdown for completed jobs
+          if (job.status === 'completed' && job.completedAt) {
+            const elapsed = Math.floor((now - job.completedAt) / 1000)
+            const remaining = Math.max(0, 5 - elapsed)
+            return { ...job, autoRemoveCountdown: remaining }
+          }
+          return job
+        }).filter(job => {
           // Remove files that were downloaded more than 10 seconds ago
           if (job.downloadedAt && now - job.downloadedAt > 10000) {
+            return false
+          }
+          // Remove files that were completed more than 5 seconds ago
+          if (job.status === 'completed' && job.completedAt && now - job.completedAt > 5000) {
             return false
           }
           return true
@@ -108,10 +130,11 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
     return () => clearInterval(cleanupInterval)
   }, [onClose])
 
-  const getFileType = (file: File): 'image' | 'video' | 'audio' | 'document' | 'svg' | 'code' | 'unknown' => {
+  const getFileType = (file: File): 'image' | 'video' | 'audio' | 'document' | 'svg' | 'ico' | 'code' | 'unknown' => {
     const extension = getFileExtension(file.name)
     
     if (extension === 'svg') return 'svg'
+    if (extension === 'ico') return 'ico'
     if (isValidImageFormat(extension)) return 'image'
     if (isValidVideoFormat(extension)) return 'video'
     if (isValidAudioFormat(extension)) return 'audio'
@@ -128,6 +151,8 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
     switch (fileType) {
       case 'svg':
         return 'png' // Default SVG conversion to PNG
+      case 'ico':
+        return 'png' // Default ICO conversion to PNG
       case 'image':
         return formatOptions.image.find(f => f.value === extension)?.value || 'jpeg'
       case 'video':
@@ -161,12 +186,29 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
     try {
       updateJob(index, { status: 'converting', progress: 0 })
       
-      // Simulate progress updates
+      // Check for ICO to SVG conversion and show warning
+      const fileExtension = getFileExtension(job.file.name)
+      if (fileExtension === 'ico' && job.targetFormat === 'svg') {
+        toast({
+          title: "ICO to SVG Conversion",
+          description: "ICO files are complex binary formats. SVG conversion may not work perfectly and will create a raster-based SVG.",
+          duration: 5000,
+        })
+      }
+      
+      // Simulate progress updates with more realistic timing
       const progressInterval = setInterval(() => {
-        setConversionJobs(prev => prev.map((job, i) => 
-          i === index ? { ...job, progress: Math.min(job.progress + 10, 90) } : job
-        ))
-      }, 200)
+        setConversionJobs(prev => prev.map((job, i) => {
+          if (i !== index) return job
+          
+          // More realistic progress simulation
+          let increment = Math.random() * 15 + 5 // 5-20% increments
+          if (job.progress > 80) {
+            increment = Math.random() * 5 + 2 // Slower progress near completion
+          }
+          return { ...job, progress: Math.min(job.progress + increment, 90) }
+        }))
+      }, 300 + Math.random() * 400) // Random interval between 300-700ms
       
       // Create form data for API request
       const formData = new FormData()
@@ -188,12 +230,29 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
       // Get the converted file as blob
       const result = await response.blob()
       
-      clearInterval(progressInterval)
-      updateJob(index, { 
-        status: 'completed', 
-        progress: 100,
-        result
-      })
+             clearInterval(progressInterval)
+       updateJob(index, { 
+         status: 'completed', 
+         progress: 100,
+         result
+       })
+       
+       // Auto-remove the file after 5 seconds when conversion is complete
+       updateJob(index, { 
+         completedAt: Date.now(),
+         autoRemoveCountdown: 5
+       })
+       
+       setTimeout(() => {
+         setConversionJobs(prev => prev.filter((job, i) => i !== index))
+         
+         // If this was the last job, close the modal
+         if (conversionJobs.length === 1) {
+           setTimeout(() => {
+             onClose()
+           }, 500) // Small delay for smooth animation
+         }
+       }, 5000) // 5 seconds delay
       
     } catch (error) {
       updateJob(index, { 
@@ -228,29 +287,50 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
   }
 
   const downloadFile = (job: ConversionJob) => {
-    if (!job.result) return
-    
-    const url = URL.createObjectURL(job.result)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${job.file.name.split('.')[0]}.${job.targetFormat}`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    
-    // Mark the file for removal after 10 seconds
-    const jobIndex = conversionJobs.findIndex(j => j.file === job.file)
-    if (jobIndex !== -1) {
-      updateJob(jobIndex, { 
-        downloadedAt: Date.now(),
-        isMarkedForRemoval: true
+    if (!job.result) {
+      toast({
+        title: "Download Failed",
+        description: "No converted file available for download.",
+        variant: "destructive",
       })
+      return
+    }
+    
+    try {
+      const url = URL.createObjectURL(job.result)
+      const a = document.createElement('a')
+      a.href = url
+      // Handle watermark removal files
+      const fileName = job.targetFormat === 'watermark-removed' 
+        ? `${job.file.name.split('.')[0]}_watermark_removed.png`
+        : `${job.file.name.split('.')[0]}.${job.targetFormat}`
+      a.download = fileName
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      // Mark the file for removal after 10 seconds
+      const jobIndex = conversionJobs.findIndex(j => j.file === job.file)
+      if (jobIndex !== -1) {
+        updateJob(jobIndex, { 
+          downloadedAt: Date.now(),
+          isMarkedForRemoval: true
+        })
+      }
       
       toast({
-        title: "File Downloaded",
-        description: `${job.file.name} will be removed in 10 seconds.`,
+        title: "Download Started",
+        description: `${job.file.name} is being downloaded.`,
         duration: 3000,
+      })
+    } catch (error) {
+      console.error('Download error:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download the converted file. Please try again.",
+        variant: "destructive",
       })
     }
   }
@@ -258,30 +338,53 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
   const downloadAll = () => {
     const completedJobs = conversionJobs.filter(job => job.status === 'completed' && job.result)
     
-    completedJobs.forEach(job => {
-      const url = URL.createObjectURL(job.result!)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${job.file.name.split('.')[0]}.${job.targetFormat}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    })
+    if (completedJobs.length === 0) {
+      toast({
+        title: "No Files to Download",
+        description: "No completed conversions available for download.",
+        variant: "destructive",
+      })
+      return
+    }
     
-    // Mark all completed files for removal
-    const now = Date.now()
-    setConversionJobs(prev => prev.map(job => 
-      job.status === 'completed' && job.result 
-        ? { ...job, downloadedAt: now, isMarkedForRemoval: true }
-        : job
-    ))
-    
-    toast({
-      title: "All Files Downloaded",
-      description: `${completedJobs.length} file(s) will be removed in 10 seconds.`,
-      duration: 3000,
-    })
+    try {
+      completedJobs.forEach(job => {
+        const url = URL.createObjectURL(job.result!)
+        const a = document.createElement('a')
+        a.href = url
+        // Handle watermark removal files
+        const fileName = job.targetFormat === 'watermark-removed' 
+          ? `${job.file.name.split('.')[0]}_watermark_removed.png`
+          : `${job.file.name.split('.')[0]}.${job.targetFormat}`
+        a.download = fileName
+        a.style.display = 'none'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      })
+      
+      // Mark all completed files for removal
+      const now = Date.now()
+      setConversionJobs(prev => prev.map(job => 
+        job.status === 'completed' && job.result 
+          ? { ...job, downloadedAt: now, isMarkedForRemoval: true }
+          : job
+      ))
+      
+      toast({
+        title: "All Files Downloaded",
+        description: `${completedJobs.length} file(s) will be removed in 10 seconds.`,
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error('Download all error:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download some files. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleFormatChange = (index: number, format: string) => {
@@ -408,9 +511,19 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
                 {conversionJobs.map((job, index) => {
                   const fileType = getFileType(job.file)
                   
+                  // Determine status for ConversionProgress component
+                  const getProgressStatus = () => {
+                    if (job.status === 'pending') return 'uploading'
+                    if (job.status === 'converting') return 'converting'
+                    if (job.status === 'completed') return 'done'
+                    if (job.status === 'error') return 'error'
+                    return 'uploading'
+                  }
+                  
                   return (
                     <Card key={index} className="p-4">
-                      <div className="space-y-3">
+                      <div className="space-y-4">
+                        {/* File Info */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <File className="w-6 h-6 text-blue-500" />
@@ -422,89 +535,89 @@ export function ConversionModal({ isOpen, onClose, files }: ConversionModalProps
                             </div>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
-                            {job.status === 'pending' && (
-                              <span className="text-sm text-muted-foreground">Pending</span>
-                            )}
-                            {job.status === 'converting' && (
-                              <div className="flex items-center space-x-2">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-sm">Converting...</span>
-                              </div>
-                            )}
-                            {job.status === 'completed' && (
-                              <div className="flex items-center space-x-2">
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                                {job.isMarkedForRemoval ? (
-                                  <div className="flex items-center space-x-2">
-                                    <span className="text-sm text-orange-500">
-                                      Removing in {Math.max(0, Math.ceil((10000 - (countdown - (job.downloadedAt || 0))) / 1000))}s
+                          {/* Format Selector for pending jobs */}
+                          {fileType !== 'unknown' && job.status === 'pending' && (
+                            <Select
+                              value={job.targetFormat}
+                              onValueChange={(value) => handleFormatChange(index, value)}
+                            >
+                              <SelectTrigger className="w-48">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {formatOptions[fileType]?.map((format) => (
+                                  <SelectItem key={format.value} value={format.value}>
+                                    <span className="flex items-center space-x-2">
+                                      <span>{format.icon}</span>
+                                      <span>{format.label}</span>
                                     </span>
-                                  </div>
-                                ) : (
-                                  <motion.div
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    transition={{ type: "spring", stiffness: 400 }}
-                                  >
-                                    <Button
-                                      size="sm"
-                                      onClick={() => downloadFile(job)}
-                                      className="h-8"
-                                    >
-                                      <motion.div
-                                        animate={{ 
-                                          y: [0, -2, 0],
-                                          scale: [1, 1.1, 1]
-                                        }}
-                                        transition={{ 
-                                          duration: 1.5,
-                                          repeat: Infinity,
-                                          repeatType: "reverse",
-                                          ease: "easeInOut"
-                                        }}
-                                      >
-                                        <Download className="w-4 h-4 mr-1" />
-                                      </motion.div>
-                                      Download
-                                    </Button>
-                                  </motion.div>
-                                )}
-                              </div>
-                            )}
-                            {job.status === 'error' && (
-                              <div className="flex items-center space-x-2">
-                                <AlertCircle className="w-4 h-4 text-red-500" />
-                                <span className="text-sm text-red-500">{job.error}</span>
-                              </div>
-                            )}
-                          </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </div>
                         
-                        {job.status === 'converting' && (
-                          <Progress value={job.progress} className="h-2" />
-                        )}
+                                                 {/* Progress Display */}
+                         <motion.div
+                           initial={{ opacity: 0, y: 10 }}
+                           animate={{ opacity: 1, y: 0 }}
+                           transition={{ delay: 0.1, duration: 0.3 }}
+                         >
+                           <ConversionProgress
+                             status={job.status === 'pending' ? 'uploading' : 
+                                    job.status === 'converting' ? 'converting' : 
+                                    job.status === 'completed' ? 'completed' : 'error'}
+                             progress={job.progress}
+                             fileName={job.file.name}
+                             onDownload={job.status === 'completed' ? () => downloadFile(job) : undefined}
+                             error={job.error}
+                           />
+                         </motion.div>
                         
-                        {fileType !== 'unknown' && job.status === 'pending' && (
-                          <Select
-                            value={job.targetFormat}
-                            onValueChange={(value) => handleFormatChange(index, value)}
-                          >
-                            <SelectTrigger className="w-48">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {formatOptions[fileType]?.map((format) => (
-                                <SelectItem key={format.value} value={format.value}>
-                                  <span className="flex items-center space-x-2">
-                                    <span>{format.icon}</span>
-                                    <span>{format.label}</span>
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
+                                                 {/* Auto-Removal Countdown */}
+                         {job.status === 'completed' && job.autoRemoveCountdown !== undefined && job.autoRemoveCountdown > 0 && (
+                           <motion.div 
+                             className="flex items-center space-x-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+                             initial={{ opacity: 0, scale: 0.95 }}
+                             animate={{ opacity: 1, scale: 1 }}
+                             exit={{ opacity: 0, scale: 0.95 }}
+                             transition={{ duration: 0.3 }}
+                           >
+                             <motion.div
+                               animate={{ 
+                                 scale: [1, 1.1, 1],
+                                 rotate: [0, 5, 0]
+                               }}
+                               transition={{ 
+                                 duration: 2,
+                                 repeat: Infinity,
+                                 ease: "easeInOut"
+                               }}
+                             >
+                               <AlertCircle className="w-4 h-4 text-blue-500" />
+                             </motion.div>
+                             <motion.span 
+                               className="text-sm text-blue-500"
+                               key={job.autoRemoveCountdown}
+                               initial={{ scale: 1.1, color: "#ef4444" }}
+                               animate={{ scale: 1, color: "#3b82f6" }}
+                               transition={{ duration: 0.3 }}
+                             >
+                               Auto-removing in {job.autoRemoveCountdown}s
+                             </motion.span>
+                           </motion.div>
+                         )}
+                         
+                         {/* Download Removal Countdown */}
+                         {job.isMarkedForRemoval && (
+                           <div className="flex items-center space-x-2 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                             <AlertCircle className="w-4 h-4 text-orange-500" />
+                             <span className="text-sm text-orange-500">
+                               Removing in {Math.max(0, Math.ceil((10000 - (countdown - (job.downloadedAt || 0))) / 1000))}s
+                             </span>
+                           </div>
+                         )}
                       </div>
                     </Card>
                   )
